@@ -1,0 +1,3 @@
+import psycopg2
+
+from sql_queries import create_tables_queries,drop_table_queries
