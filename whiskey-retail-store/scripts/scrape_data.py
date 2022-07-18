@@ -30,10 +30,10 @@ def scrape_html(base_url,page):
     
     req=requests.get(url)
     
-    print(req)
+    # print(req)
     soup = BeautifulSoup(req.content,'lxml')
     
-    print(soup)
+    # print(soup)
     
     return soup
     
@@ -159,12 +159,14 @@ def update_dataset(data,new_data):
 
 #scrap all the webpages
 
-def get_links(url='https://www.thewhiskyexchange.com/'):
+def get_links(url='https://www.thewhiskyexchange.com'):
     url=url
     req=requests.get(url)
     soup=BeautifulSoup(req.content,'lxml')
+    # print(soup)
     
-    a_tags=soup.findall('a',class_='subnav__link')
+    a_tags=soup.find_all('a',class_='subnav__link')
+    # print(a_tags)
     
     link_list=[]
     for link in a_tags:
@@ -173,13 +175,53 @@ def get_links(url='https://www.thewhiskyexchange.com/'):
     relevant_links=[]
     
     for link in link_list:
-        if link is not None and '/c/' in link and 'while' in link and '?' not in link:
+        if link is not None and '/c/' in link and 'whisky' in link and '?' not in link:
             relevant_links.append(link)
             
+    # print(link_list)
     return relevant_links
+def scrape_whisky(url='https://www.thewhiskyexchange.com', number_of_pages=5):
+    df=pd.DataFrame()
+    #create scrapper object
+    generated_links=get_links()
     
-soup=scrape_html('https://www.thewhiskyexchange.com/c/40/single-malt-scotch-whisky',1)
-# get_product_data(soup)
-product_data = get_product_data(soup)
-product_content = get_product_content(soup)
-print(create_df(clean_product_data(product_data),clean_product_name(product_content)))
+    for link in generated_links:
+        try:
+            for page in range (0,number_of_pages):
+                soup=scrape_html(base_url=url+link+'?pg=',page=page+1)
+                product_content=get_product_content(soup)
+                product_data=get_product_data(soup)
+                
+                name=clean_product_name(product_content)[0]
+                percentage=clean_product_name(product_content)[1]
+                percentage_cl=clean_product_name(product_content)[2]
+                
+                price=clean_product_data(product_data)[0]
+                unit_price=clean_product_data(product_data)[1]
+                
+                if page == 0:
+                    data=create_df(clean_product_data(product_data),clean_product_name(product_content))
+                
+                data=update_dataset(data,create_df(clean_product_data(product_data),clean_product_name(product_content)))
+                    
+        except Exception as e:
+            print("Error with link {}:".format(e))
+            # continue
+                
+        finally:
+            start_location=link.rfind('/')+1
+            end_location=len(link)
+            data.to_csv('../data/'+link[start_location:end_location]+'.csv')
+            df=df.append(data,ignore_index=True)
+            
+    return df
+
+
+print(scrape_whisky())
+    
+# soup=scrape_html('https://www.thewhiskyexchange.com/c/40/single-malt-scotch-whisky',1)
+# # get_product_data(soup)
+# product_data = get_product_data(soup)
+# product_content = get_product_content(soup)
+# print(create_df(clean_product_data(product_data),clean_product_name(product_content)))
+# print(get_links())
