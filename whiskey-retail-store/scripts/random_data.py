@@ -9,7 +9,9 @@ try:
     import random
     import time
     from datetime import datetime
+    from tqdm import tqdm as tq
     print("Successfully imported modules")
+    from connect_db import sql_connection
     
 except ImportError as e:
     
@@ -248,7 +250,7 @@ payment_df['product_id'] = product_id_payments
 
 query= '''
 
-SELECT p1.*,d1.Product_price
+SELECT p1.*,d1.Product_price AS price
 FROM payment_df p1
 inner join data d1
 USING (product_id)
@@ -260,3 +262,315 @@ payment_data=sql(query)
 
 print(payment_data.head())
 
+# Normalization of tables
+#2NF-1
+
+#crete a countries table 
+unique_countries=customer_df['country'].unique()
+countries_data=pd.DataFrame(unique_countries, columns=['Country'])
+countries_data['Country_Code']=countries_data['Country'].str[0:3]
+countries_data['Country_Code']=countries_data['Country_Code'].str.upper()
+countries_data['Country_id']=[* range(0,len(countries_data))]
+
+print(countries_data.head())
+
+
+#LINK to customers_table
+
+query= '''
+
+SELECT c2.Country_id
+FROM customer_df AS c1
+JOIN countries_data AS c2
+
+ON
+    c1.country_code=c2.Country_Code AND
+    c1.country=c2.Country
+
+
+'''
+
+country_ids=sql(query)
+print(country_ids)
+
+customer_df['Country_id']=country_ids
+
+print(customer_df)
+
+#Now to drop the redundant data from the customer table
+
+customer_df=customer_df.drop(['country','country_code'], axis=1)
+
+#Creating new table
+unique_credit_cards=customer_df['credit_provider'].unique()
+customer_cc_df=pd.DataFrame(unique_credit_cards, columns=['credit_provider'])
+customer_cc_df['Credit_Card_Company_id']=[* range(0,len(customer_cc_df))]
+
+print(customer_cc_df.head())
+
+
+#Create join query
+
+query= '''
+
+SELECT c2.Credit_Card_Company_id
+FROM customer_df as c1
+JOIN customer_cc_df AS c2
+USING (credit_provider)
+
+'''
+
+credit_provider_ids=sql(query)
+
+customer_df['credit_provider_id']=credit_provider_ids
+
+customer_df=customer_df.drop(['credit_provider'], axis=1)
+
+
+
+#create department ids from the tables
+
+departments=pd.Series(employee_df['department'].unique()).to_list()
+
+#generating unique department 
+department_id=[*range(0,len(departments))]
+
+#creating a departments table
+department_df=pd.DataFrame(department_id,columns=['department_id'])
+department_df['department']=departments
+
+print(department_df)
+
+#connect it to employees table
+
+query= '''
+
+SELECT d1.department_id
+FROM employee_df AS e1
+JOIN department_df AS d1
+USING (department)
+
+'''
+
+department_ids=sql(query)
+
+employee_df['department_id'] = department_ids
+
+employee_df=employee_df.drop('department',axis=1)
+
+#we insert data into the database
+#first we convert the data into a list of arrays
+
+with sql_connection() as connection:
+    cursor=connection.cursor()
+    
+
+    # Convert the Dataframe into a list of arrays
+    print("Converting countries dataset")
+    records = countries_data.to_records(index=False)
+
+    # Convert the list of arrays into a tuple of tuples
+    result = tuple(records)
+    print("Inserting countries data to db")
+    for i in range(0,len(result)):
+        
+        # Create a new record
+        query = "insert into countries (country, country_code, country_id) values {}".format(result[i])
+        
+        # Execute the query
+        cursor.execute(query)
+        
+        
+    # Commit the transaction
+    connection.commit()
+    print("Successfully inserted")
+    records=customer_cc_df.to_records(index=False)
+    print("First five array records: ",records[:5])
+    #convert into tuples
+    results=tuple(records)
+
+    for index in tq(range(0,len(results)),desc="Inserting data"):
+        query="INSERT INTO customer_cc(credit_provider,credit_provider_id) VALUES {}".format(results[index])
+        
+        
+        cursor.execute(query)
+        
+    connection.commit()
+
+    #we do the same for the products table
+    print("Generating product tuples")
+    records=data.to_records(index=False)
+
+    results=tuple(records)
+
+    print("Inserting data")
+    for index in tq(range(0,len(results)),desc="Inserting data"):
+        try:
+            query= '''
+
+                INSERT INTO products(Product_Name, Alcohol_Price,Alcohol_Unit,Alcohol_Percentage,Alcohol_Percentage_cl,Product_id )
+                VALUES {}
+            
+            
+            
+            '''.format(results[index])
+            
+            cursor.execute(query)
+        except Exception as e:
+            print ("Error inserting data to table: " + str(e))
+            exit(1)
+            
+        
+    connection.commit()
+    print("Successfully committed data to database")
+
+
+
+    print("converting records dat into list")
+    # Convert the Dataframe into a list of arrays
+    records = department_df.to_records(index=False)
+
+    # Convert the list of arrays into a tuple of tuples
+    result = tuple(records)
+
+    print("Inserting data to database" )
+    for data in tq(range(0,len(result)),desc="Inserting data"):
+        
+        try:
+            # Create a new record
+            query = "insert into departments(department_id, department) values {}".format(result[data])
+            
+            # Execute the query
+            cursor.execute(query)
+        except AssertionError as e:
+            print("Assertion Error inserting data to table: " + str(e))
+            exit(1)
+        except Exception as e:
+            print("Error inserting data to table: " + str(e))
+            exit(1)
+            
+        
+        
+    # Commit the transaction
+    connection.commit()
+    print("Committing changes to database")
+
+
+
+    print("Converting customer records into an array")
+    # Convert the Dataframe into a list of arrays
+    records = customer_df.to_records(index=False)
+
+    # Convert the list of arrays into a tuple of tuples
+    result = tuple(records)
+
+    print("Attempting to insert data into database")
+    for data in tq(range(0,len(result)),desc="Inserting data"):
+        try: 
+            # Create a new record
+            query = "insert into customers(customer_id, first_name, last_name, full_name, email, street, four_digits, country_id, credit_provider_id) values {}".format(result[data])
+            
+            # Execute the query
+            cursor.execute(query)
+        except AssertionError as e:
+            print("Assertion Error inserting data to table: " + str(e))
+            exit(1)
+        
+        except Exception as e:
+            print("Error inserting data to table: " + str(e))
+            exit(1)
+            
+    print("Successfully inserted data into table")   
+    # Commit the transaction
+    connection.commit()
+
+    print("Committing changes to database")
+
+    # Convert the list of arrays into a tuple of tuples
+    # Convert the Dataframe into a list of arrays
+
+    print("Converting employee records into an array")
+    records = payment_data.to_records(index=False)
+
+    # Convert the list of arrays into a tuple of tuples
+    result = tuple(records)
+    print(result[:5])
+
+    print("Attempting to insert records into database")
+    for index in tq(range(0,len(result)),desc="Inserting data"):
+        
+        try:
+            # Create a new record
+            query = "insert into payments(payment_id, date,customer_id,employee_id,product_id,price) values {}".format(result[index])
+            
+            # Execute the query
+            cursor.execute(query)
+            
+        except AssertionError as e:
+            print("Assertion Error inserting data to table: " + str(e))
+            exit(1)
+            
+        except Exception as e:
+            print("Error inserting data to table: " + str(e))
+            exit(1)
+        
+        
+    print("Successfully inserted data into table")
+    # Commit the transaction
+    connection.commit()
+    print("Commit transaction successfully")
+
+    print("Converting employee records into an array")
+    records=employee_df.to_records(index=False)
+    result = tuple(records)
+
+
+    print("Attempting to insert dat into table")
+    for data in tq(range(0,len(result)),desc="Inserting data"):
+        
+        try:
+        # Create a new record
+            query = "insert into employees(employee_id, first_name, last_name, full_name,email,city, department_id) values {}".format(result[data])
+            
+            # Execute the query
+            cursor.execute(query)
+            
+        except Exception as e:
+            print("Error inserting data to table: " + str(e))
+            exit(1)
+            
+    print("Successfully inserted data into table")
+        
+        
+    # Commit the transaction
+    connection.commit()
+
+    print("Successfully committed data to database")
+    # Convert the Dataframe into a list of arrays
+
+    # print("Converting payments record to array")
+    # records = payment_df.to_records(index=False)
+
+    # # Convert the list of arrays into a tuple of tuples
+    # result = tuple(records)
+
+
+    # print("Attempting to insert data into database")
+    # for data in tq(range(0,len(result)),desc="Inserting data"):
+    #     try:
+    #         # Create a new record
+    #         query = "insert into payments(payment_id, date,customer_id,employee_id,product_id,price) values {}".format(result[data])
+            
+    #         # Execute the query
+    #         cursor.execute(query)
+        
+    #     except Exception as e:
+    #         print("Error inserting data to table: " + str(e))
+    #         exit(1)
+
+    # print("Successfully inserted data into table")
+        
+    # # Commit the transaction
+    # connection.commit()
+
+    print("Successfully committed data to database")
