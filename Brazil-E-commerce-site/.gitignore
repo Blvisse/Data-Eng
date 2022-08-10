@@ -1,1 +1,7 @@
 /data
+.env
+/airflow/.env
+/airflow/dags/scripts/.env
+/airflow/data
+/airflow/logs
+/airflow/plugins
