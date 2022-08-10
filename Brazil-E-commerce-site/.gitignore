@@ -1,7 +1,7 @@
-/data
-.env
-/airflow/.env
-/airflow/dags/scripts/.env
+/Savings & Investments Survey.csv
+/analysis.ipynb
+/discard.py
 /airflow/data
+/airflow/scripts/*.csv
 /airflow/logs
 /airflow/plugins
