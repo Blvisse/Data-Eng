@@ -17,6 +17,7 @@ To successfully run this project, you will need to have:
 1. Creating a simple docker image and including system variables
 2. Running postgres on docker
 3. Reading ny_taxi data from [datalink] and ingesting it to postgres database
+4. Dockerising the ingestion script
 
 ## 2. Running postgres on docker
 
@@ -56,7 +57,7 @@ Having installed postgres you can follow the [notebook] to create a connection t
 
 
 
-## 4. Creating docker network and using pgcli
+## 3.2 Creating docker network and using pgcli
 
 install pgcli using the commands
 ```
@@ -152,6 +153,19 @@ You will be now able to access pgadmin on localhost:8080 with username and passw
 Set up the server and voila you have the database from the  postgres container 
 
 Congrats on making it this far you are a true data engineer :clap:
+
+
+## 4. Dockerising the ingestion script
+
+Instead of running the docker images on seperate containers we can create a docker-compose file to have them in the same container and in the same network. 
+To do this we have created a docker-compose.yml file in the root directory of the folder. To run all you have to do is type in the command 
+
+```
+docker-compose up
+```
+
+After that you can access pgadmin4 on ``localhost:8080`` with username and password as same as before.
+
 
 [datalink]:(https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
 [notebook]:docker_intro/notebooks/migrate_data.ipynb
