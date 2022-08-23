@@ -11,6 +11,7 @@ try:
     
 except ModuleNotFoundError as me:
     print("Module not found: {}".format(me))
+    exit(1)
     
     
 def main(parameters):
@@ -23,7 +24,8 @@ def main(parameters):
     csv_name="../data/yellow_tripdata_2014-01.parquet"
     
     try:
-        os.system(f"curl.exe {url} -o {csv_name}")
+        # os.system(f"curl.exe {url} -o {csv_name}")
+        os.system(f"wget {url} -O {csv_name}")
         print("Successfully downloaded data ...")
         
     except Exception as e:
