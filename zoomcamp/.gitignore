@@ -2,3 +2,4 @@
 /docker_intro/data/*
 /terraform/.terraform
 /keys
+/terraform/*.hcl

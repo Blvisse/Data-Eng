@@ -1,9 +1,11 @@
 locals {
-  data_lake_bucket = "blvisse_testbucket_1"
+  data_lake_bucket = "dtc-test-bucket"
 }
 
 variable "project" {
   description = "Your GCP Project ID"
+  default="dtc-dataeng2"
+  type=string
 }
 
 variable "region" {
